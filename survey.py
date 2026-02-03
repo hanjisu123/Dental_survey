@@ -62,8 +62,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # [설정] 최상위 이미지 폴더 경로
-# (배포 시에는 "." 로, 로컬 테스트 시에는 절대 경로로 사용하세요)
-# IMAGE_ROOT = "." 
 IMAGE_ROOT = "."
 
 # 폴더 이름 매핑
@@ -374,3 +372,4 @@ elif st.session_state.page == 'finish':
     except Exception as e:
 
         st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")
+
