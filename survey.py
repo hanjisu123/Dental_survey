@@ -4,6 +4,8 @@ import os
 from datetime import datetime
 from PIL import Image
 import re
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # --- 1. 기본 설정 및 CSS 스타일링 ---
 st.set_page_config(page_title="임상 유용성 평가 설문", layout="wide")
@@ -94,7 +96,6 @@ def load_image(filename, type_key):
     """이미지 로드 함수"""
     folder_name = FOLDER_NAMES[type_key]
     folder_path = os.path.join(IMAGE_ROOT, folder_name)
-    
     exact_path = os.path.join(folder_path, filename)
     if os.path.exists(exact_path):
         return Image.open(exact_path)
@@ -107,20 +108,32 @@ def load_image(filename, type_key):
     
     return Image.new('RGB', (300, 300), color=(220, 220, 220))
 
-def save_data():
-    """데이터 CSV 저장"""
-    df = pd.DataFrame([st.session_state.responses])
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = st.session_state.responses.get('Evaluator_Name', 'Unknown')
-    filename = f"survey_result_{name}_{timestamp}.csv"
-    df.to_csv(filename, index=False, encoding='utf-8-sig')
-    return filename
+def save_data_to_google_sheet(data_dict):
+    """구글 시트에 데이터 저장"""
+    try:
+        # Secrets에서 인증 정보 로드
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
+        client = gspread.authorize(creds)
+        
+        # 시트 열기 (이름이 정확해야 합니다!)
+        sheet = client.open("Dental_Survey_Results").sheet1 
+        
+        # 첫 줄(헤더)이 비어있으면 채우기
+        if not sheet.get_all_values():
+            sheet.append_row(list(data_dict.keys()))
+            
+        # 데이터 한 줄 추가
+        sheet.append_row(list(data_dict.values()))
+        return True
+    except Exception as e:
+        st.error(f"⚠️ 구글 시트 저장 오류: {e}")
+        return False
 
 # --- 3. 세션 상태 초기화 ---
 if 'page' not in st.session_state: st.session_state.page = 'intro'
 if 'responses' not in st.session_state: st.session_state.responses = {}
 if 'current_index' not in st.session_state: st.session_state.current_index = 0
-
 if 'file_list' not in st.session_state:
     st.session_state.file_list = get_image_files()
 
@@ -365,12 +378,17 @@ elif st.session_state.page == 'part2':
 elif st.session_state.page == 'finish':
     st.balloons()
     st.title("설문에 참여해 주셔서 감사합니다.")
-    try:
-        filename = save_data()
-        st.success(f"평가 결과가 성공적으로 저장되었습니다.")
-        st.markdown("창을 닫으셔도 좋습니다.")
-    except Exception as e:
 
-        st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")
-
+    if 'data_saved' not in st.session_state:
+        with st.spinner("결과를 서버(구글 시트)에 저장 중입니다..."):
+            success = save_data_to_google_sheet(st.session_state.responses)
+            if success:
+                st.session_state.data_saved = True
+                st.success("✅ 설문 결과가 성공적으로 제출되었습니다!")
+            else:
+                st.error("⚠️ 저장 중 문제가 발생했습니다. 관리자에게 문의해주세요.")
+    else:
+        st.success("✅ 이미 제출이 완료되었습니다.")
+        
+    st.markdown("창을 닫으셔도 좋습니다.")
 
