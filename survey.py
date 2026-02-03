@@ -111,24 +111,63 @@ def load_image(filename, type_key):
 def save_data_to_google_sheet(data_dict):
     """구글 시트에 데이터 저장"""
     try:
-        # Secrets에서 인증 정보 로드
+        # 1. 구글 인증 및 시트 열기
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
         client = gspread.authorize(creds)
-        
-        # 시트 열기 (이름이 정확해야 합니다!)
         sheet = client.open("Dental_Survey_Results").sheet1 
+
+        # 2. 헤더(제목) 리스트 만들기
+        # 형식: 이름 / 소속 / 경력 / (1).jpg ... (50).jpg / 1.1 ... 4.3
+        headers = ["이름", "소속병원/기관", "임상 경력", "전문 과목"] # 전문 과목도 포함했습니다 (데이터 유실 방지)
         
-        # 첫 줄(헤더)이 비어있으면 채우기
+        # Case 1~50 헤더 생성 ((1).jpg, (2).jpg ...)
+        for i in range(1, 51):
+            headers.append(f"({i}).jpg") 
+            
+        # Part 2 헤더 생성
+        headers.extend([
+            "1.1", "1.2", 
+            "2.1", "2.2", 
+            "3.1", "3.2", 
+            "4.1", "4.2", "4.3"
+        ])
+
+        # 3. 값(Value) 리스트 만들기 - 헤더 순서와 정확히 일치해야 함
+        row_data = [
+            response_dict.get('Evaluator_Name', ''),
+            response_dict.get('Affiliation', ''),
+            response_dict.get('Experience', ''),
+            response_dict.get('Specialty', '')
+        ]
+
+        # Case 1~50 선택값 (Method A / Method B 등)
+        for i in range(1, 51):
+            # 딕셔너리에서 해당 케이스의 선택(Choice) 값만 가져옴
+            choice = response_dict.get(f'Case_{i}_Choice', '')
+            row_data.append(choice)
+            
+        # Part 2 답변 값
+        part2_keys = [
+            "1-1_Anatomical_Detail", "1-2_Overmasking_Prevention",
+            "2-1_Diagnostic_Efficiency", "2-2_Workflow_Predictability",
+            "3-1_Bias_Elimination", "3-2_Scalability",
+            "4-1_Final_Preference", "4-2_Adoption_Intent", "4-3_Expert_Opinion"
+        ]
+        for key in part2_keys:
+            row_data.append(response_dict.get(key, ''))
+
+        # 4. 시트에 쓰기
+        # 시트가 비어있으면 헤더부터 씁니다.
         if not sheet.get_all_values():
-            sheet.append_row(list(data_dict.keys()))
+            sheet.append_row(headers)
             
         # 데이터 한 줄 추가
-        sheet.append_row(list(data_dict.values()))
-        return True
+        sheet.append_row(row_data)
+        return True, sheet.spreadsheet.url
+
     except Exception as e:
-        st.error(f"⚠️ 구글 시트 저장 오류: {e}")
-        return False
+        return False, str(e)
 
 # --- 3. 세션 상태 초기화 ---
 if 'page' not in st.session_state: st.session_state.page = 'intro'
@@ -382,13 +421,16 @@ elif st.session_state.page == 'finish':
     if 'data_saved' not in st.session_state:
         with st.spinner("결과를 서버(구글 시트)에 저장 중입니다..."):
             success = save_data_to_google_sheet(st.session_state.responses)
-            if success:
+            if is_success:
                 st.session_state.data_saved = True
+                st.session_state.sheet_url = result_msg
                 st.success("✅ 설문 결과가 성공적으로 제출되었습니다!")
+                st.markdown(f"👉 **[저장된 구글 시트 바로가기]({result_msg})**")
             else:
                 st.error("⚠️ 저장 중 문제가 발생했습니다. 관리자에게 문의해주세요.")
     else:
         st.success("✅ 이미 제출이 완료되었습니다.")
         
     st.markdown("창을 닫으셔도 좋습니다.")
+
 
