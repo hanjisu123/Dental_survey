@@ -367,9 +367,10 @@ elif st.session_state.page == 'finish':
     st.title("설문에 참여해 주셔서 감사합니다.")
     try:
         filename = save_data()
-        st.success(f"평가 결과가 성공적으로 저장되었습니다.\n파일명: {filename}")
+        st.success(f"평가 결과가 성공적으로 저장되었습니다.")
         st.markdown("창을 닫으셔도 좋습니다.")
     except Exception as e:
 
         st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")
+
 
