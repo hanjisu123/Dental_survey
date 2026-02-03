@@ -109,7 +109,7 @@ def load_image(filename, type_key):
     return Image.new('RGB', (300, 300), color=(220, 220, 220))
 
 def save_data_to_google_sheet(response_dict):
-    """구글 시트에 데이터 저장 (순서 정렬 버그 수정)"""
+    """구글 시트에 데이터 저장 (타임스탬프 맨 앞, 헤더 생성 제거)"""
     try:
         # 1. 구글 인증 및 시트 열기
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -117,33 +117,19 @@ def save_data_to_google_sheet(response_dict):
         client = gspread.authorize(creds)
         sheet = client.open("Dental_Survey_Results").sheet1 
 
-        # 2. 헤더(제목) 리스트 만들기
-        # 형식: 이름 / 소속 / 경력 / 전문과목 / (1).jpg ... (50).jpg / 1.1 ... 4.3
-        headers = ["이름", "소속병원/기관", "임상 경력", "전문 과목"]
+        # 2. 값(Value) 리스트 만들기
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Case 1~50 헤더 생성
-        for i in range(1, 51):
-            headers.append(f"({i}).jpg") 
-            
-        # Part 2 헤더 생성
-        headers.extend([
-            "1.1", "1.2", 
-            "2.1", "2.2", 
-            "3.1", "3.2", 
-            "4.1", "4.2", "4.3", "Timestamp"
-        ])
-
-        # 3. 값(Value) 리스트 만들기 - 헤더 순서와 1:1 매칭
         row_data = [
-            response_dict.get('Evaluator_Name', ''),
-            response_dict.get('Affiliation', ''),
-            response_dict.get('Experience', ''),
-            response_dict.get('Specialty', '')
+            timestamp,                                   # 1. 타임스탬프 (A열)
+            response_dict.get('Evaluator_Name', ''),     # 2. 이름 (B열)
+            response_dict.get('Affiliation', ''),        # 3. 소속 (C열)
+            response_dict.get('Experience', ''),         # 4. 경력 (D열)
+            response_dict.get('Specialty', '')           # 5. 전문 과목 (E열)
         ]
 
         # Case 1~50 선택값 (Method A/B)
         for i in range(1, 51):
-            # 헤더는 (1).jpg지만, 들어가는 값은 'Method A' 같은 선택지여야 함
             choice = response_dict.get(f'Case_{i}_Choice', '')
             row_data.append(choice)
             
@@ -157,13 +143,9 @@ def save_data_to_google_sheet(response_dict):
         for key in part2_keys:
             row_data.append(response_dict.get(key, ''))
             
-        # 타임스탬프 추가
-        row_data.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        # [삭제됨] 마지막에 타임스탬프 추가하던 코드 삭제
 
-        # 4. 시트에 쓰기
-        if not sheet.get_all_values():
-            sheet.append_row(headers)
-            
+        # 3. 데이터 추가 (헤더 확인 없이 바로 추가)
         sheet.append_row(row_data)
         return True, sheet.spreadsheet.url
 
@@ -439,5 +421,6 @@ elif st.session_state.page == 'finish':
             st.markdown(f"👉 **[저장된 구글 시트 바로가기]({st.session_state.sheet_url})**")
     
     st.markdown("창을 닫으셔도 좋습니다.")
+
 
 
