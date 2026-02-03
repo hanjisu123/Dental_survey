@@ -64,7 +64,7 @@ st.markdown("""
 # [설정] 최상위 이미지 폴더 경로
 # (배포 시에는 "." 로, 로컬 테스트 시에는 절대 경로로 사용하세요)
 # IMAGE_ROOT = "." 
-IMAGE_ROOT = "D:/Dental_Teeth/260111_Dental_RSH_Survey/images"
+IMAGE_ROOT = "."
 
 # 폴더 이름 매핑
 FOLDER_NAMES = {
@@ -372,4 +372,5 @@ elif st.session_state.page == 'finish':
         st.success(f"평가 결과가 성공적으로 저장되었습니다.\n파일명: {filename}")
         st.markdown("창을 닫으셔도 좋습니다.")
     except Exception as e:
+
         st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")
