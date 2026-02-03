@@ -11,31 +11,28 @@ st.set_page_config(page_title="임상 유용성 평가 설문", layout="wide")
 # [CSS] 스타일링 정의
 st.markdown("""
 <style>
-    /* 1. 라디오 버튼 선택지 텍스트 (Original, Method A 등) 스타일 */
+    /* 1. 라디오 버튼 선택지 텍스트 스타일 */
     div[class*="stRadio"] label p {
-        font-size: 20px !important;
+        font-size: 18px !important;
         font-weight: bold !important;
     }
     
-    /* 2. 라디오 버튼 컨테이너 강제 중앙 정렬 */
+    /* 2. 라디오 버튼 컨테이너 (가로 정렬) */
     div[role="radiogroup"] {
         display: flex !important;
-        justify-content: center !important; /* 내부 아이템 가운데 정렬 */
+        justify-content: center !important;
         width: 100% !important;
-        gap: 60px !important; /* 선택지 사이 간격 */
+        gap: 40px !important;
     }
 
-    /* 3. 라디오 버튼 위젯 자체의 마진 조정 */
+    /* 3. 라디오 버튼 위젯 여백 */
     div[data-testid="stRadio"] {
         width: 100% !important;
-        display: flex;
-        justify-content: center !important;
-        align-items: center !important;
         margin-top: 10px;
         margin-bottom: 20px;
     }
     
-    /* 4. 이미지 캡션 크기 및 정렬 */
+    /* 4. 캡션 스타일 */
     div[data-testid="caption"] {
         font-size: 16px !important;
         text-align: center !important;
@@ -49,16 +46,25 @@ st.markdown("""
     }
     
     /* 6. PART 2 질문 텍스트 스타일 */
-    .question-text {
+    .question-title {
         font-size: 18px;
-        font-weight: 600;
+        font-weight: 700;
+        margin-top: 20px;
+        margin-bottom: 5px;
+        color: #ffffff;
+    }
+    .question-desc {
+        font-size: 14px;
+        color: #ffffff;
         margin-bottom: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # [설정] 최상위 이미지 폴더 경로
-IMAGE_ROOT = "."
+# (배포 시에는 "." 로, 로컬 테스트 시에는 절대 경로로 사용하세요)
+# IMAGE_ROOT = "." 
+IMAGE_ROOT = "D:/Dental_Teeth/260111_Dental_RSH_Survey/images"
 
 # 폴더 이름 매핑
 FOLDER_NAMES = {
@@ -91,19 +97,16 @@ def load_image(filename, type_key):
     folder_name = FOLDER_NAMES[type_key]
     folder_path = os.path.join(IMAGE_ROOT, folder_name)
     
-    # 1. 정확한 매칭
     exact_path = os.path.join(folder_path, filename)
     if os.path.exists(exact_path):
         return Image.open(exact_path)
     
-    # 2. 숫자 기반 매칭
     target_num = extract_number(filename)
     if os.path.exists(folder_path):
         for f in os.listdir(folder_path):
             if extract_number(f) == target_num and f.lower().endswith(('.png', '.jpg', '.jpeg')):
                 return Image.open(os.path.join(folder_path, f))
     
-    # 3. 실패 시 회색 박스
     return Image.new('RGB', (300, 300), color=(220, 220, 220))
 
 def save_data():
@@ -151,14 +154,12 @@ if st.session_state.page == 'intro':
         name = col1.text_input("성함")
         affiliation = col2.text_input("소속 병원/기관")
         experience = st.number_input("임상 경력 (년)", min_value=0, step=1)
-        specialty = st.text_input("전문 과목")
         
         if st.form_submit_button("설문 시작하기"):
             if name and affiliation:
                 st.session_state.responses['Evaluator_Name'] = name
                 st.session_state.responses['Affiliation'] = affiliation
                 st.session_state.responses['Experience'] = experience
-                st.session_state.responses['Specialty'] = specialty
                 st.session_state.page = 'instruction'
                 st.rerun()
             else:
@@ -236,74 +237,112 @@ elif st.session_state.page == 'part1':
                 st.session_state.page = 'part2'
                 st.rerun()
 
-# [PAGE 3] PART 2. 종합 평가 (디자인 수정됨)
+# [PAGE 3] PART 2. 종합 평가 (새로운 질문 적용)
 elif st.session_state.page == 'part2':
-    st.header("PART 2. 종합 평가")
-    st.info("모든 케이스를 검토하신 후, 기술적/임상적 측면에서 Method A와 B를 평가해 주십시오.")
+    st.header("PART 2. 알고리즘 성능 및 임상적 가치 종합 평가")
+    st.info("50개의 케이스를 모두 검토하신 결과를 바탕으로, 각 알고리즘이 지닌 치의학적 가치와 고충실도(High-fidelity) 데이터 확보 가능성에 대해 평가해 주십시오.")
     
     with st.form("part2_form"):
-        # --- Method A ---
-        st.subheader("1. [Method A] 평가")
-        st.markdown("**1-1. 시각적 품질 및 재현성**")
-        q1_a_1 = st.slider("1. 치아 표면의 반사광이 인위적이지 않고 자연스럽게 제거되었습니까?", 1, 5, 3)
-        q1_a_2 = st.slider("2. 제거 후에도 치아의 구조 및 주변 잇몸 조직이 왜곡 없이 잘 보존되었습니까?", 1, 5, 3)
-        q1_a_3 = st.slider("3. 치아 본연의 색상과 명도가 왜곡 없이 유지되었습니까?", 1, 5, 3)
+        # --- Section 1 ---
+        st.subheader("1. 해부학적 무결성 및 재현성 (Anatomical Integrity & Fidelity)")
         
-        st.markdown("**1-2. 임상적 진단 유용성**")
-        q1_a_4 = st.slider("4. 반사광에 가려졌던 충치나 미세 균열 등의 병변 식별이 용이해졌습니까?", 1, 5, 3)
-        q1_a_5 = st.slider("5. 반사광으로 인한 오진 가능성을 줄이고 진단 정확도에 기여합니까?", 1, 5, 3)
-        q1_a_6 = st.slider("6. 임상 적용 시 고품질 이미지 확보 시간을 단축할 것 같습니까?", 1, 5, 3)
+        st.markdown('<p class="question-title">1.1. 해부학적 세부 구조 보존</p>', unsafe_allow_html=True)
+        st.markdown('<p class="question-desc">Method B는 반사광 제거 시 법랑질 특유의 질감이나 미세한 굴곡 등 해부학적 세부 사항을 왜곡 없이 유지합니까?</p>', unsafe_allow_html=True)
+        q1_1 = st.select_slider(
+            "1.1_label", 
+            options=[1, 2, 3, 4, 5], 
+            value=3, 
+            label_visibility="collapsed",
+            format_func=lambda x: f"{x}" if x in [2,3,4] else f"{x} ({'전혀 보존되지 않음' if x==1 else '매우 잘 보존됨'})"
+        )
+        
+        st.markdown('<p class="question-title">1.2. 과도한 마스킹 방지</p>', unsafe_allow_html=True)
+        st.markdown('<p class="question-desc">Method B는 정상적인 치아 조직 정보까지 손실시키는 과도한 마스킹(Over-masking) 문제를 효과적으로 해결했다고 판단하십니까?</p>', unsafe_allow_html=True)
+        q1_2 = st.select_slider(
+            "1.2_label", 
+            options=[1, 2, 3, 4, 5], 
+            value=3, 
+            label_visibility="collapsed",
+            format_func=lambda x: f"{x}" if x in [2,3,4] else f"{x} ({'전혀 그렇지 않음' if x==1 else '매우 그러함'})"
+        )
+        
+        st.write("---")
+
+        # --- Section 2 ---
+        st.subheader("2. 임상적 예측 가능성 및 유용성 (Clinical Predictability & Utility)")
+        
+        st.markdown('<p class="question-title">2.1. 진단 및 판독 효율성</p>', unsafe_allow_html=True)
+        st.markdown('<p class="question-desc">반사광에 의해 왜곡되지 않은 선명한 데이터가 임상가의 정확한 판독과 시계열적 추적 관찰(Longitudinal monitoring)에 실질적인 근거를 제공합니까?</p>', unsafe_allow_html=True)
+        q2_1 = st.select_slider(
+            "2.1_label", 
+            options=[1, 2, 3, 4, 5], 
+            value=3, 
+            label_visibility="collapsed",
+            format_func=lambda x: f"{x}" if x in [2,3,4] else f"{x} ({'전혀 기여하지 않음' if x==1 else '매우 크게 기여함'})"
+        )
+
+        st.markdown('<p class="question-title">2.2. 워크플로우 예측 가능성</p>', unsafe_allow_html=True)
+        st.markdown('<p class="question-desc">정밀한 표면 데이터 복원이 CAD/CAM 기반 수복물 설계 시 오차를 최소화하고 예측 가능성(Predictability)을 높이는 데 유용합니까?</p>', unsafe_allow_html=True)
+        q2_2 = st.select_slider(
+            "2.2_label", 
+            options=[1, 2, 3, 4, 5], 
+            value=3, 
+            label_visibility="collapsed",
+            format_func=lambda x: f"{x}" if x in [2,3,4] else f"{x} ({'전혀 유용하지 않음' if x==1 else '매우 유용함'})"
+        )
 
         st.write("---")
 
-        # --- Method B ---
-        st.subheader("2. [Method B] 평가")
-        st.markdown("**2-1. 시각적 품질 및 재현성**")
-        q1_b_1 = st.slider("1. 치아 표면의 반사광이 인위적이지 않고 자연스럽게 제거되었습니까? (Method B)", 1, 5, 3)
-        q1_b_2 = st.slider("2. 제거 후에도 치아의 구조 및 주변 잇몸 조직이 왜곡 없이 잘 보존되었습니까? (Method B)", 1, 5, 3)
-        q1_b_3 = st.slider("3. 치아 본연의 색상과 명도가 왜곡 없이 유지되었습니까? (Method B)", 1, 5, 3)
+        # --- Section 3 ---
+        st.subheader("3. 데이터 표준화 및 확장성 (Standardization & Scalability)")
         
-        st.markdown("**2-2. 임상적 진단 유용성**")
-        q1_b_4 = st.slider("4. 반사광에 가려졌던 충치나 미세 균열 등의 병변 식별이 용이해졌습니까? (Method B)", 1, 5, 3)
-        q1_b_5 = st.slider("5. 반사광으로 인한 오진 가능성을 줄이고 진단 정확도에 기여합니까? (Method B)", 1, 5, 3)
-        q1_b_6 = st.slider("6. 임상 적용 시 고품질 이미지 확보 시간을 단축할 것 같습니까? (Method B)", 1, 5, 3)
+        st.markdown('<p class="question-title">3.1. 사용자 편향(Observer Bias) 제거</p>', unsafe_allow_html=True)
+        st.markdown('<p class="question-desc">Method B의 자동화 파이프라인이 수작업 마스킹 시 발생하는 사용자 편향을 제거하고 데이터의 객관적 신뢰성을 보장한다고 보십니까?</p>', unsafe_allow_html=True)
+        q3_1 = st.select_slider(
+            "3.1_label", 
+            options=[1, 2, 3, 4, 5], 
+            value=3, 
+            label_visibility="collapsed",
+            format_func=lambda x: f"{x}" if x in [2,3,4] else f"{x} ({'전혀 보장하지 않음' if x==1 else '매우 확실히 보장함'})"
+        )
+
+        st.markdown('<p class="question-title">3.2. 대규모 데이터 확장성</p>', unsafe_allow_html=True)
+        st.markdown('<p class="question-desc">자동 전처리 공정이 향후 고도화된 진단 AI 학습을 위한 대규모 High-fidelity 데이터셋 확보에 도움이 될 것이라 판단하십니까?</p>', unsafe_allow_html=True)
+        q3_2 = st.select_slider(
+            "3.2_label", 
+            options=[1, 2, 3, 4, 5], 
+            value=3, 
+            label_visibility="collapsed",
+            format_func=lambda x: f"{x}" if x in [2,3,4] else f"{x} ({'전혀 필요하지 않음' if x==1 else '매우 필수적임'})"
+        )
 
         st.write("---")
 
-        # --- 종합 (수정된 디자인) ---
-        st.subheader("3. 종합적 선호도 및 실무 도입 의사")
+        # --- Section 4 ---
+        st.subheader("4. 종합 결론")
         
-        # 3.1 질문 (텍스트 분리)
-        st.markdown("""<p class="question-text">3.1 시각적 품질과 진단 유용성을 모두 고려했을 때, 가장 반사광이 잘 제거된 결과물은 무엇입니까?</p>""", unsafe_allow_html=True)
-        final_pref = st.radio(
-            "3.1_hidden_label",
-            options=["Original", "Method A", "Method B"],
+        st.markdown('<p class="question-title">4.1. 최종 선호 알고리즘</p>', unsafe_allow_html=True)
+        st.markdown('<p class="question-desc">모든 임상적/기술적 요소를 고려할 때 가장 우수하다고 판단되는 알고리즘은 무엇입니까?</p>', unsafe_allow_html=True)
+        q4_1 = st.radio(
+            "4.1_label",
+            options=["Method A", "Method B"],
             horizontal=True,
             label_visibility="collapsed"
         )
-        
-        st.write("") # 간격
 
-        # 3.2 이유
-        st.markdown("""<p class="question-text">3.2 위 선택을 하신 결정적인 이유는 무엇입니까?</p>""", unsafe_allow_html=True)
-        reason = st.text_area("3.2_hidden_label", label_visibility="collapsed", placeholder="예: 디테일 보존 우수, 이질감 없음 등")
-
-        st.write("")
-
-        # 3.3 도입 의향
-        st.markdown("""<p class="question-text">3.3 해당 기술을 실제 진료에 도입하실 의향이 있습니까?</p>""", unsafe_allow_html=True)
-        adoption = st.select_slider(
-            "3.3_hidden_label",
-            options=["매우 낮음", "낮음", "보통", "높음", "매우 높음"],
-            value="보통",
-            label_visibility="collapsed"
+        st.markdown('<p class="question-title">4.2. 실무 도입 의향</p>', unsafe_allow_html=True)
+        st.markdown('<p class="question-desc">Method B를 실제 임상 현장이나 연구 데이터 정제 공정에 도입하실 의향이 있습니까?</p>', unsafe_allow_html=True)
+        q4_2 = st.select_slider(
+            "4.2_label",
+            options=[1, 2, 3, 4, 5],
+            value=3,
+            label_visibility="collapsed",
+            format_func=lambda x: f"{x}" if x in [2,3,4] else f"{x} ({'의사 전혀 없음' if x==1 else '매우 강한 의사 있음'})"
         )
-        
-        st.write("")
 
-        # 4. 전문가 의견
-        st.markdown("""<p class="question-text">4. 전문가 추가 의견</p>""", unsafe_allow_html=True)
-        expert_opinion = st.text_area("4_hidden_label", label_visibility="collapsed", placeholder="자유롭게 의견을 남겨주세요.")
+        st.markdown('<p class="question-title">4.3. 전문가 정성 의견</p>', unsafe_allow_html=True)
+        st.markdown('<p class="question-desc">Method B가 디지털 진단 및 맞춤형 수복물 제작에 기여할 것으로 기대되는 측면이나 보완점을 자유롭게 서술해 주십시오.</p>', unsafe_allow_html=True)
+        expert_opinion = st.text_area("4.3_label", label_visibility="collapsed")
         
         st.write("")
         st.write("")
@@ -311,12 +350,15 @@ elif st.session_state.page == 'part2':
         # 제출 버튼
         if st.form_submit_button("설문 제출하기"):
             st.session_state.responses.update({
-                "Method_A_Naturalness": q1_a_1, "Method_A_Structure": q1_a_2, "Method_A_Color": q1_a_3,
-                "Method_A_Identify": q1_a_4, "Method_A_Accuracy": q1_a_5, "Method_A_Time": q1_a_6,
-                "Method_B_Naturalness": q1_b_1, "Method_B_Structure": q1_b_2, "Method_B_Color": q1_b_3,
-                "Method_B_Identify": q1_b_4, "Method_B_Accuracy": q1_b_5, "Method_B_Time": q1_b_6,
-                "Final_Preference": final_pref, "Preference_Reason": reason,
-                "Adoption_Intent": adoption, "Expert_Opinion": expert_opinion
+                "1-1_Anatomical_Detail": q1_1,
+                "1-2_Overmasking_Prevention": q1_2,
+                "2-1_Diagnostic_Efficiency": q2_1,
+                "2-2_Workflow_Predictability": q2_2,
+                "3-1_Bias_Elimination": q3_1,
+                "3-2_Scalability": q3_2,
+                "4-1_Final_Preference": q4_1,
+                "4-2_Adoption_Intent": q4_2,
+                "4-3_Expert_Opinion": expert_opinion
             })
             st.session_state.page = 'finish'
             st.rerun()
